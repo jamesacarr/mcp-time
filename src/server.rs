@@ -19,7 +19,7 @@ const ERR_INVALID_TIME_FORMAT: &str =
 ///
 /// Exposes `get_current_time` and `convert_time` as MCP tools over stdio transport.
 pub struct TimeServer {
-    tool_router: ToolRouter<Self>,
+    pub tool_router: ToolRouter<Self>,
 }
 
 /// Parameters for the `get_current_time` tool.
@@ -66,6 +66,12 @@ struct ConvertTimeResponse {
     time_difference: String,
 }
 
+impl Default for TimeServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimeServer {
     /// Create a new TimeServer with tool routing configured.
     pub fn new() -> Self {
@@ -82,7 +88,7 @@ impl TimeServer {
         name = "get_current_time",
         description = "Get the current time in a specific timezone. Defaults to UTC if no timezone is provided."
     )]
-    async fn get_current_time(
+    pub async fn get_current_time(
         &self,
         Parameters(params): Parameters<GetCurrentTimeParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
@@ -126,7 +132,7 @@ impl TimeServer {
         name = "convert_time",
         description = "Convert a time from one timezone to another."
     )]
-    async fn convert_time(
+    pub async fn convert_time(
         &self,
         Parameters(params): Parameters<ConvertTimeParams>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {

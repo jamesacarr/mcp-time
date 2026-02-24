@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 
+[lib]
+name = "mcp_time"
+path = "src/lib.rs"
+
 [[bin]]
 name = "mcp-time"
 path = "src/main.rs"

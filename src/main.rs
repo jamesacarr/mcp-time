@@ -1,7 +1,5 @@
-mod server;
-
+use mcp_time::server::TimeServer;
 use rmcp::{ServiceExt, transport::stdio};
-use server::TimeServer;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
