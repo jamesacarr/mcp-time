@@ -1,4 +1,4 @@
-// mod server;
+mod server;
 
 use tracing_subscriber::EnvFilter;
 
