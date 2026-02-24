@@ -1,6 +1,6 @@
 mod server;
 
-use rmcp::{transport::stdio, ServiceExt};
+use rmcp::{ServiceExt, transport::stdio};
 use server::TimeServer;
 use tracing_subscriber::EnvFilter;
 
