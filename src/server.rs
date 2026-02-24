@@ -264,17 +264,21 @@ fn parse_timezone(input: &str) -> Result<jiff::tz::TimeZone, String> {
         ));
     }
 
-    jiff::tz::TimeZone::get(input).map_err(|_| {
-        // Check if it looks like an abbreviation (all uppercase, short)
-        if input.len() <= 5 && input.chars().all(|c| c.is_ascii_uppercase()) {
-            format!(
-                "Timezone abbreviation '{}' is ambiguous. Please use a valid IANA timezone name (e.g., 'America/New_York' instead of 'EST').",
-                input
-            )
-        } else {
-            ERR_INVALID_TIMEZONE.replacen("{}", input, 1)
-        }
-    })
+    // Reject timezone abbreviations (all uppercase, no '/', short, not "UTC")
+    // before calling jiff, since some abbreviations like "EST" exist in the
+    // IANA database but are ambiguous and should not be accepted.
+    if input != "UTC"
+        && !input.contains('/')
+        && input.len() <= 5
+        && input.chars().all(|c| c.is_ascii_uppercase())
+    {
+        return Err(format!(
+            "Timezone abbreviation '{}' is ambiguous. Please use a valid IANA timezone name (e.g., 'America/New_York' instead of 'EST').",
+            input
+        ));
+    }
+
+    jiff::tz::TimeZone::get(input).map_err(|_| ERR_INVALID_TIMEZONE.replacen("{}", input, 1))
 }
 
 /// Format a UTC offset as "+HH:MM" or "-HH:MM".
@@ -519,6 +523,183 @@ mod tests {
         assert_eq!(result.is_error, Some(true));
         let text = extract_text(&result);
         assert!(text.contains("Invalid time format"));
+    }
+
+    // --- get_current_time: missing tests ---
+
+    #[tokio::test]
+    async fn get_current_time_deprecated_timezone() {
+        let server = TimeServer::new();
+        let params = GetCurrentTimeParams {
+            timezone: Some("US/Eastern".into()),
+        };
+        let result = server.get_current_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        let text = extract_text(&result);
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        // US/Eastern is a backward-compat IANA link; should resolve successfully
+        assert!(json["datetime"].is_string());
+        assert!(json["utc_offset"].is_string());
+    }
+
+    #[tokio::test]
+    async fn get_current_time_dst_true() {
+        let server = TimeServer::new();
+        let params = GetCurrentTimeParams {
+            timezone: Some("America/New_York".into()),
+        };
+        let result = server.get_current_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        let text = extract_text(&result);
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        // Structural test: is_dst key exists and is boolean.
+        // The actual value depends on when the test runs (DST vs standard time).
+        assert!(
+            json["is_dst"].is_boolean(),
+            "Expected is_dst to be a boolean, got: {:?}",
+            json["is_dst"]
+        );
+    }
+
+    #[tokio::test]
+    async fn get_current_time_abbreviation_timezone() {
+        let server = TimeServer::new();
+        let params = GetCurrentTimeParams {
+            timezone: Some("EST".into()),
+        };
+        let result = server.get_current_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(true));
+        let text = extract_text(&result);
+        assert!(
+            text.contains("IANA timezone name"),
+            "Error should suggest IANA name, got: {text}"
+        );
+    }
+
+    #[tokio::test]
+    async fn get_current_time_offset_timezone() {
+        let server = TimeServer::new();
+        let params = GetCurrentTimeParams {
+            timezone: Some("UTC+5".into()),
+        };
+        let result = server.get_current_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(true));
+        let text = extract_text(&result);
+        assert!(
+            text.contains("IANA timezone name"),
+            "Error should suggest IANA name, got: {text}"
+        );
+    }
+
+    // --- convert_time: missing tests ---
+
+    #[tokio::test]
+    async fn convert_time_fractional_offset() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "12:00".into(),
+            target_timezone: "Asia/Kathmandu".into(),
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        let text = extract_text(&result);
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let target_dt = json["target"]["datetime"].as_str().unwrap();
+        assert!(
+            target_dt.contains("17:45"),
+            "Expected 17:45 for UTC+5:45, got: {target_dt}"
+        );
+    }
+
+    #[tokio::test]
+    async fn convert_time_invalid_target_timezone() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "12:00".into(),
+            target_timezone: "Bad/Zone".into(),
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(true));
+        let text = extract_text(&result);
+        assert!(text.contains("Invalid timezone"));
+    }
+
+    #[tokio::test]
+    async fn convert_time_non_numeric_time() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "abc".into(),
+            target_timezone: "UTC".into(),
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(true));
+        let text = extract_text(&result);
+        assert!(text.contains("Invalid time format"));
+    }
+
+    #[tokio::test]
+    async fn convert_time_midnight() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "00:00".into(),
+            target_timezone: "America/New_York".into(),
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        let text = extract_text(&result);
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let source_dt = json["source"]["datetime"].as_str().unwrap();
+        assert!(
+            source_dt.contains("00:00"),
+            "Source should be midnight, got: {source_dt}"
+        );
+        // NY is UTC-5 or UTC-4 — target should be previous day 19:00 or 20:00
+        let target_dt = json["target"]["datetime"].as_str().unwrap();
+        assert!(
+            target_dt.contains("19:00") || target_dt.contains("20:00"),
+            "Expected 19:00 or 20:00 for midnight UTC->NY, got: {target_dt}"
+        );
+    }
+
+    #[tokio::test]
+    async fn convert_time_end_of_day() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "23:59".into(),
+            target_timezone: "Asia/Tokyo".into(), // UTC+9
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        let text = extract_text(&result);
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        // 23:59 UTC + 9h = 08:59 next day in Tokyo
+        let target_dt = json["target"]["datetime"].as_str().unwrap();
+        assert!(
+            target_dt.contains("08:59"),
+            "Expected 08:59 for 23:59 UTC->Tokyo, got: {target_dt}"
+        );
+    }
+
+    #[tokio::test]
+    async fn convert_time_iso_datetime_input() {
+        let server = TimeServer::new();
+        let params = ConvertTimeParams {
+            source_timezone: "UTC".into(),
+            time: "2026-02-24T14:30:00".into(),
+            target_timezone: "UTC".into(),
+        };
+        let result = server.convert_time(Parameters(params)).await.unwrap();
+        assert_eq!(result.is_error, Some(true));
+        let text = extract_text(&result);
+        assert!(
+            text.contains("Invalid time format"),
+            "Should reject ISO datetime, got: {text}"
+        );
     }
 
     /// Extract text content from a CallToolResult.
