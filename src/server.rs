@@ -1,6 +1,3 @@
-// TODO: Remove this allow once main.rs uses TimeServer (Task 2.2)
-#![allow(dead_code)]
-
 use rmcp::{
     ServerHandler,
     handler::server::{tool::ToolRouter, wrapper::Parameters},

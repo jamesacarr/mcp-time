@@ -1,5 +1,7 @@
 mod server;
 
+use rmcp::{transport::stdio, ServiceExt};
+use server::TimeServer;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -9,8 +11,8 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    // TODO: Wire up TimeServer with stdio transport in Wave 2
-    // TimeServer::new().serve(stdio()).await?.waiting().await?;
+    let service = TimeServer::new().serve(stdio()).await?;
+    service.waiting().await?;
 
     Ok(())
 }
