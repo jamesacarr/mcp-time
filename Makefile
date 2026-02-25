@@ -1,4 +1,4 @@
-.PHONY: help build release run test fmt lint check clean
+.PHONY: help build release install run test fmt lint check clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -8,6 +8,9 @@ build: ## Build debug binary
 
 release: ## Build release binary
 	cargo build --release
+
+install: ## Build release binary and install to cargo bin
+	cargo install --path .
 
 run: ## Run the server
 	cargo run
