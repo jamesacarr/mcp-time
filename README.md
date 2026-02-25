@@ -30,6 +30,27 @@ Convert a time from one timezone to another.
 
 ## Installation
 
+### Pre-built binaries
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/jamesacarr/mcp-time/releases):
+
+| Platform      | Archive                        |
+|---------------|--------------------------------|
+| Linux (x64)   | `mcp-time-linux-x64.tar.gz`   |
+| Linux (arm64)  | `mcp-time-linux-arm64.tar.gz` |
+| macOS (arm64)  | `mcp-time-darwin-arm64.tar.gz`|
+| Windows (x64)  | `mcp-time-windows-x64.zip`   |
+
+Extract the binary and place it somewhere on your `PATH`.
+
+### Cargo
+
+```sh
+cargo install --git https://github.com/jamesacarr/mcp-time.git
+```
+
+### From source
+
 ```sh
 cargo install --path .
 ```
