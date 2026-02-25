@@ -38,7 +38,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
 |---------------|--------------------------------|
 | Linux (x64)   | `mcp-time-linux-x64.tar.gz`   |
 | Linux (arm64)  | `mcp-time-linux-arm64.tar.gz` |
-| macOS (arm64)  | `mcp-time-darwin-arm64.tar.gz`|
+| macOS (arm64)  | `mcp-time-macos-arm64.tar.gz`|
 | Windows (x64)  | `mcp-time-windows-x64.zip`   |
 
 Extract the binary and place it somewhere on your `PATH`.
